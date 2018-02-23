@@ -50,11 +50,12 @@ def main():
         logging.error('stdin entry is not yet supported')
         sys.exit(1)
     logging.getLogger('').setLevel(logging.ERROR if args.quiet else logging.DEBUG)
+    logging.debug(args)
     options = latexoptions(args)
     logging.debug(options)
     files = ["source%d%s"%(i, os.path.splitext(f)[-1]) for i,f in enumerate(args.file)]
     latexcode = buildlatex(options, files)
-    texfile = 'mintscript.tex'
+    texfile = 'mintscript_temp.tex'
     pdffile = texfile[:-3] + 'pdf'
     cwd = os.getcwd()
     with tempdir() as _:
@@ -69,7 +70,10 @@ def main():
         with open(texfile,'w') as fp:
             fp.write(latexcode)
         logging.debug('LaTeX code:\n%s' % latexcode)
-        commandline = ['xelatex','-shell-escape','-batch',texfile]
+        if args.quiet:
+            commandline = ['xelatex','-shell-escape','-interaction=batchmode','-8bit',texfile]
+        else:
+            commandline = ['xelatex','-8bit','-shell-escape','-interaction=nonstopmode','-halt-on-error',texfile]
         for i in range(2): # run latex twice due to labels
             status = subprocess.call(commandline)
             if status != 0:

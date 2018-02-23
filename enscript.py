@@ -3,12 +3,13 @@
 '''
 
 import argparse
-import os
-import re
 import datetime
-import socket
-import pwd
 import json
+import logging
+import os
+import pwd
+import re
+import socket
 import sys
 
 def parseargs():
@@ -27,7 +28,7 @@ def parseargs():
         help="same as --columns=2")
     parser.add_argument('-1', dest='columns', action='store_const', const=1,
         help="same as --columns=1")
-    parser.add_argument('-b', '--header', nargs=1,
+    parser.add_argument('-b', '--header',
         help="set page header")
     parser.add_argument('-B', '--no-header', action='store_true', default=False,
         help="no page headers")
@@ -37,21 +38,21 @@ def parseargs():
         help="precede each line with its line number")
     parser.add_argument('-E', '--highlight', nargs='?',
         help="highlight source code (see pygmentize -L lexers)")
-    parser.add_argument('-f', '--font', metavar='NAME', nargs=1,
+    parser.add_argument('-f', '--font', metavar='NAME',
         help="use font NAME for body text")
-    parser.add_argument('-F', '--header-font', metavar='NAME', nargs=1,
+    parser.add_argument('-F', '--header-font', metavar='NAME',
         help="use font NAME for header text")
     parser.add_argument('--fancy-header', metavar='NAME', nargs='?', const=True,
         help="select fancy page header")
     parser.add_argument('-h', '--no-job-header', action='store_true',
         help="suppress the job header page")
-    parser.add_argument('-I', '--filter', metavar='CMD', nargs=1,
+    parser.add_argument('-I', '--filter', metavar='CMD',
         help="read input files through input filter CMD")
     parser.add_argument('-j', '--borders', action='store_true',
         help="print borders around columns")
-    parser.add_argument('-M', '--media', metavar='PAPER', nargs=1,
+    parser.add_argument('-M', '--media', metavar='PAPER',
         help="use output media PAPER")
-    parser.add_argument('-p', '-o', '--output', metavar='FILE', nargs=1,
+    parser.add_argument('-p', '-o', '--output', metavar='FILE',
         help="leave output to file FILE.  If FILE is `-', leave output to stdout.")
     parser.add_argument('-q', '--quiet', '--silent', dest='quiet', action='store_true',
         help="Suppress stdout")
@@ -59,21 +60,21 @@ def parseargs():
         help="print in landscape mode")
     parser.add_argument('-R', '--portrait', action='store_true',
         help="print in portrait mode")
-    parser.add_argument('-s', '--baselineskip', metavar='NUM', nargs=1, type=int,
+    parser.add_argument('-s', '--baselineskip', metavar='NUM', type=int,
         help="set baselineskip to NUM")
-    parser.add_argument('-T', '--tabsize', metavar='NUM', nargs=1, type=int,
+    parser.add_argument('-T', '--tabsize', metavar='NUM', type=int,
         help="set tabulator size to NUM")
-    parser.add_argument('-u', '--underlay', metavar='TEXT', nargs=1,
+    parser.add_argument('-u', '--underlay', metavar='TEXT',
         help="print TEXT under every page") # enscript allow empty for removing underlay w.r.t config file
     parser.add_argument('-V', '--version', action='store_true', default=False,
         help="print version number")
-    parser.add_argument('-X', '--encoding', metavar='NAME', nargs=1,
+    parser.add_argument('-X', '--encoding', metavar='NAME',
         help="use input encoding NAME")
     parser.add_argument('--color', metavar='bool', nargs='?', type=bool,
         help="create color outputs with states")
-    parser.add_argument('--filter-stdin', metavar='NAME', nargs=1,
+    parser.add_argument('--filter-stdin', metavar='NAME',
         help="specify how stdin is shown to the input filter")
-    parser.add_argument('--footer', metavar='FOOTER', nargs=1,
+    parser.add_argument('--footer', metavar='FOOTER',
         help="set page footer")
     parser.add_argument('--help', action="store_true",
         help="print this help and exit")
@@ -81,21 +82,21 @@ def parseargs():
         help="adjust page marginals")
     parser.add_argument('--mark-wrapped-lines', metavar='STYLE', nargs='?',
         help="mark wrapped lines in the output with STYLE")
-    parser.add_argument('--style', metavar='STYLE', nargs=1,
+    parser.add_argument('--style', metavar='STYLE',
         help="use highlight style STYLE (see pygmentize -L styles)")
     parser.add_argument('--swap-even-page-margins', action="store_true",
         help="swap left and right side margins for each even numbered page")
     parser.add_argument('--toc', action="store_true",
         help="print table of contents")
-    parser.add_argument('--ul-angle', metavar='ANGLE', nargs=1, type=float,
+    parser.add_argument('--ul-angle', metavar='ANGLE', type=float,
         help="set underlay text's angle to ANGLE")
-    parser.add_argument('--ul-font', metavar='NAME', nargs=1,
+    parser.add_argument('--ul-font', metavar='NAME',
         help="print underlays with font NAME")
-    parser.add_argument('--ul-gray', metavar='NUM', nargs=1, type=float,
+    parser.add_argument('--ul-gray', metavar='NUM', type=float,
         help="print underlays with gray value NUM")
-    parser.add_argument('--ul-position', metavar='POS', nargs=1,
+    parser.add_argument('--ul-position', metavar='POS',
         help="set underlay's starting position to POS")
-    parser.add_argument('--ul-style', metavar='STYLE', nargs=1,
+    parser.add_argument('--ul-style', metavar='STYLE',
         help="print underlays with style STYLE")
     parser.add_argument('--word-wrap', action="store_true",
         help="wrap long lines from word boundaries")
@@ -174,6 +175,7 @@ def parsefont(fontstr):
     '''
     font, size = None, None
     try:
+        logging.debug('Decoding font: %s' % repr(fontstr))
         fontdata = json.loads(fontstr)
         if isinstance(fontdata, basestring):
             font = fontdata

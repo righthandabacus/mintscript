@@ -87,10 +87,10 @@ def latexoptions(args):
     elif not args.no_header:
         ret['header'] = parseformat("$N\t$D{%c}\t$%", args.file)
     if args.header_font: # also use as footer font
-        ret['header_font'] = parsefont(args['header_font'])
+        ret['header_font'] = parsefont(args.header_font)
     if args.underlay:
         ret['underlay'] = {'text':args.underlay, 'gray':80, 'angle':45
-                          ,'xpos':0, 'ypos':0, 'style':'filled'}
+                          ,'xpos':0, 'ypos':0, 'style':'filled', 'font':(None,None)}
         if args.ul_font:
             ret['underlay']['font'] = parsefont(args.ul_font)
         if args.ul_angle:
@@ -116,11 +116,11 @@ def buildlatex(opt, filenames):
     preamble = [''
        ,r'\documentclass{article}'
        ,r'\usepackage[%s]{geometry}' % ','.join(opt['geometry'])
+       ,r'\usepackage{amssymb}' # for symbols at line wrapping, just in case
        ,r'\usepackage{fontspec}'
        ,r'\usepackage{minted}'
-       ,r'\usepackage{amssymb}' # for symbols at line wrapping, just in case
        ,r'\usemintedstyle{%s}'%opt['mintedstyle'] if opt['mintedstyle'] else None
-    ]+(['' # underlay
+    ]+(['' # underlay (TODO broken, should not use background package)
        ,r'\usepackage{tikz}'
        ,r'\usepackage{tikzpagenodes}'
        ,r'\usepackage{background}'
@@ -134,15 +134,13 @@ def buildlatex(opt, filenames):
        ,r'   color=black,'
        ,r'   contents={'
        ,r'     \begin{tikzpicture}[remember picture,overlay]'
-       ,r'       ', r'\Overlayfont' if opt['underlay']['font'][0] else None
-       ,       (r'\fontsize{%(s)d}{%(s)d}' % {'s':opt['underlay']['font'][1]})
+       ,r'        \Overlayfont' if opt['underlay']['font'][0] else None
+      ,(r'        \fontsize{%(s)d}{%(s)d}' % {'s':opt['underlay']['font'][1]})
                       if opt['underlay']['font'][1] else None
-       ,        r'\selectfont' if opt['underlay']['font'] else None
+       ,r'        \selectfont' if any(opt['underlay']['font']) else None
        ,r'       \node[text=black!%(gray)f!white,rotate=%(angle)f] at '
-                   '($(current page text area.south west)'
-                   '!0.5!'
-                   '(current page text area.north east) + (%(xpos)s,%(ypos)s)$)'
-                   ' {%(text)s};' % opt['underlay']['gray']
+                   '($(current page.center) + (%(xpos)s,%(ypos)s)$)'
+                   ' {%(text)s};' % opt['underlay']
        ,r'     \end{tikzpicture}'
        ,r'   }'
        ,r'}'
@@ -154,11 +152,11 @@ def buildlatex(opt, filenames):
     ])
     if not opt['header'] and not opt['footer']:
         preamble.extend([
-            r'\pagestyle{fancy}'
+            r'\pagestyle{empty}'
         ])
     else:
         preamble.extend([''
-           ,r'\usepackage{fancyheader}'
+           ,r'\usepackage{fancyhdr}'
            ,r'\pagestyle{fancy}'
            ,r'\renewcommand{\headrulewidth}{0pt}'
            ,r'\renewcommand{\footrulewidth}{0pt}'
@@ -187,7 +185,7 @@ def buildlatex(opt, filenames):
             ])
         elif opt['header']:
             preamble.extend([''
-               ,r'\fancyhead{%s}' % opt['header']
+               ,r'\fancyhead[C]{%s}' % opt['header'].replace('\t',r'\hfill{}')
             ])
         if opt['footer'] and isinstance(opt['footer'], (tuple,list)):
             preamble.extend(['' # left, center, and right footers
@@ -197,7 +195,7 @@ def buildlatex(opt, filenames):
             ])
         elif opt['footer']:
             preamble.extend([''
-               ,r'\fancyfoot{%s}' % opt['footer']
+               ,r'\fancyfoot[C]{%s}' % opt['footer'].replace('\t',r'\hfill{}')
             ])
     body = [''
        ,r'\begin{document}'
