@@ -49,38 +49,45 @@ def main():
     if len(args.file) < 1:
         logging.error('stdin entry is not yet supported')
         sys.exit(1)
-    options = latexoptions(args, args.file)
-    print(options)
-    files = ['.'.join(["source%d"%i, os.path.splitext(f)[-1]]) for i,f in enumerate(args.file)]
+    options = latexoptions(args)
+    logging.debug(options)
+    files = ["source%d%s"%(i, os.path.splitext(f)[-1]) for i,f in enumerate(args.file)]
     latexcode = buildlatex(options, files)
     texfile = 'mintscript.tex'
     pdffile = texfile[:-3] + 'pdf'
     cwd = os.getcwd()
     with tempdir() as dirpath:
         for oldpath,newpath in zip(args.file, files):
+            oldpath = os.path.join(cwd, oldpath)
             if not os.path.isfile(oldpath):
                 logging.error('Cannot read file %s' % oldpath)
                 sys.exit(1)
             shutil.copyfile(oldpath, newpath)
+            logging.debug('Copied %s to %s' % (oldpath, newpath))
         assert(texfile not in files)
         with open(texfile,'w') as fp:
             fp.write(latexcode)
+        logging.debug('LaTeX code:\n%s' % latexcode)
         commandline = ['xelatex','-shell-escape','-batch',texfile]
-        status = subprocess.call(commandline)
-        if status != 0:
-            logging.error('xelatex failed with return code %s' % status)
-            sys.exit(status)
+        for i in range(2): # run latex twice due to labels
+            status = subprocess.call(commandline)
+            if status != 0:
+                logging.error('xelatex failed with return code %s' % status)
+                sys.exit(status)
         if not os.path.isfile(pdffile):
             logging.error('xelatex completed but %s not found in output' % pdffile)
             sys.exit(1)
         if not args.output:
             args.output = os.path.splitext(args.file[0])[0] + '.pdf'
+        logging.debug('Output to %s' % args.output)
         if args.output == '-':
             sys.stdout.buffer.write(open(pdffile).read()) # dump binary to stdout
         elif args.output:
             shutil.copyfile(pdffile, os.path.join(cwd,args.output))
 
 if __name__ == '__main__':
+    logging.basicConfig(format='%(asctime)s:%(name)s(%(lineno)d):%(levelname)s:%(message)s')
+    logging.getLogger('').setLevel(logging.DEBUG)
     main()
 
 # vim:set et sw=4 ts=4:

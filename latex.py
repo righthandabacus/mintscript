@@ -1,4 +1,5 @@
 import re
+from enscript import parseformat
 
 def latexoptions(args):
     '''Convert command line options parsed by argparse into LaTeX packages'
@@ -10,8 +11,8 @@ def latexoptions(args):
     Returns:
         dict: holds LaTeX packages options
     '''
-    ret = {'input':args.file, 'geometry':[], 'minted':[], 'mintedlang':''
-          ,'mintedstyle':'', 'font':(None,None), 'header':None, 'footer':None}
+    ret = {'input':args.file, 'geometry':['xetex'], 'minted':[], 'mintedlang':'text'
+          ,'mintedstyle':'autumn', 'font':('Inconsolata','6pt'), 'header':None, 'footer':None}
     if args.columns==1:
         ret['geometry'].append('onecolumn')
     elif args.columns==2:
@@ -34,6 +35,8 @@ def latexoptions(args):
         ret['minted'].append('frame=single')
     if args.media:
         ret['geometry'].append(args.media) # TODO need sanitation check
+    else:
+        ret['geometry'].append('letterpaper') # TODO need sanitation check
     if args.landscape:
         ret['geometry'].append('landscape')
     if args.portrait:
@@ -47,6 +50,8 @@ def latexoptions(args):
             "%s=%s" % (t,v)
             for t,v in zip(["left","right","top","bottom"], args.margins)
         )
+    else:
+        ret['geometry'].append('margin=15mm')
     if args.truncate_lines:
         ret['minted'].append('breaklines=false')
     else:
@@ -145,11 +150,11 @@ def buildlatex(opt, filenames):
        ,r'\setsansfont[%(a)s]{%(f)s}' % {'a':opt.get('fontspec_args',''),'f':opt['font'][0]}
        ,r'\setmainfont[%(a)s]{%(f)s}' % {'a':opt.get('fontspec_args',''),'f':opt['font'][0]}
     ] if opt['font'][0] else [])+([
-        # header and footer
+        # TODO header and footer
     ])
     body = [''
        ,r'\begin{document}'
-       ,r'\fontsize{%d}{%d}\selectfont' % opt['font'][1] if opt['font'][1] else None
+       ,r'\fontsize{%(s)s}{%(s)s}\selectfont' % {'s':opt['font'][1]} if opt['font'][1] else None
     ]+[
        (r'\inputminted[%(a)s]{%(l)s}{%(f)s}' + '\n')
             % {'a':','.join(opt['minted']), 'l':opt['mintedlang'], 'f':f}
