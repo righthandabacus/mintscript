@@ -49,6 +49,7 @@ def main():
     if len(args.file) < 1:
         logging.error('stdin entry is not yet supported')
         sys.exit(1)
+    logging.getLogger('').setLevel(logging.ERROR if args.quiet else logging.DEBUG)
     options = latexoptions(args)
     logging.debug(options)
     files = ["source%d%s"%(i, os.path.splitext(f)[-1]) for i,f in enumerate(args.file)]
@@ -56,7 +57,7 @@ def main():
     texfile = 'mintscript.tex'
     pdffile = texfile[:-3] + 'pdf'
     cwd = os.getcwd()
-    with tempdir() as dirpath:
+    with tempdir() as _:
         for oldpath,newpath in zip(args.file, files):
             oldpath = os.path.join(cwd, oldpath)
             if not os.path.isfile(oldpath):
@@ -87,7 +88,6 @@ def main():
 
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s:%(name)s(%(lineno)d):%(levelname)s:%(message)s')
-    logging.getLogger('').setLevel(logging.DEBUG)
     main()
 
 # vim:set et sw=4 ts=4:

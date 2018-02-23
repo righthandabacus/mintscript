@@ -1,5 +1,5 @@
 import re
-from enscript import parseformat
+from enscript import parseformat, parsefont
 
 def latexoptions(args):
     '''Convert command line options parsed by argparse into LaTeX packages'
@@ -12,7 +12,8 @@ def latexoptions(args):
         dict: holds LaTeX packages options
     '''
     ret = {'input':args.file, 'geometry':['xetex'], 'minted':[], 'mintedlang':'text'
-          ,'mintedstyle':'autumn', 'font':('Inconsolata','6pt'), 'header':None, 'footer':None}
+          ,'mintedstyle':'autumn', 'font':('Inconsolata','8pt')
+          ,'header_font':('Inconsolata','8pt'), 'header':None, 'footer':None}
     if args.columns==1:
         ret['geometry'].append('onecolumn')
     elif args.columns==2:
@@ -98,7 +99,7 @@ def latexoptions(args):
             assert(0 <= args.ul_gray <= 1)
             ret['underlay']['gray'] = args.ul_gray*100 # default 0.8
         if args.ul_position:
-            m = re.match(r'([+-]\d+)([+-]\d+)', ul_position) # e.g. +10-10
+            m = re.match(r'([+-]\d+)([+-]\d+)', args.ul_position) # e.g. +10-10
             assert(m)
             ret['underlay']['xpos'] = int(m.group(1))
             ret['underlay']['ypos'] = int(m.group(2))
@@ -149,9 +150,55 @@ def buildlatex(opt, filenames):
        ,r'\setmonofont[%(a)s]{%(f)s}' % {'a':opt.get('fontspec_args',''),'f':opt['font'][0]}
        ,r'\setsansfont[%(a)s]{%(f)s}' % {'a':opt.get('fontspec_args',''),'f':opt['font'][0]}
        ,r'\setmainfont[%(a)s]{%(f)s}' % {'a':opt.get('fontspec_args',''),'f':opt['font'][0]}
-    ] if opt['font'][0] else [])+([
-        # TODO header and footer
+    ] if opt['font'][0] else [
     ])
+    if not opt['header'] and not opt['footer']:
+        preamble.extend([
+            r'\pagestyle{fancy}'
+        ])
+    else:
+        preamble.extend([''
+           ,r'\usepackage{fancyheader}'
+           ,r'\pagestyle{fancy}'
+           ,r'\renewcommand{\headrulewidth}{0pt}'
+           ,r'\renewcommand{\footrulewidth}{0pt}'
+           ,r'\fancyhf{}'
+        ])
+        font,size = opt.get('header_font',[None,None])
+        fontprepend = ''
+        if font:
+            preamble.extend([''
+               ,r'\newfontfamily\Headerfont{%s}' % font
+            ])
+            fontprepend=r'\Headerfont'
+        if size:
+            fontprepend+=r'\fontsize{%(s)s}{%(s)s}' % {'s':size}
+        if fontprepend:
+            fontprepend+=r'\selectfont{}'
+        if 'twoside' in opt['geometry']:
+            left, right = 'LO,RE', 'RO,LE'
+        else:
+            left, right = 'L', 'R'
+        if opt['header'] and isinstance(opt['header'], (tuple,list)):
+            preamble.extend(['' # left, center, and right headers
+               ,r'\fancyhead[%s]{%s%s}' % (left,fontprepend,opt['header'][0])  if opt['header'][0] else None
+               ,r'\fancyhead[C]{%s%s}'  % (fontprepend,opt['header'][1])       if opt['header'][1] else None
+               ,r'\fancyhead[%s]{%s%s}' % (right,fontprepend,opt['header'][2]) if opt['header'][2] else None
+            ])
+        elif opt['header']:
+            preamble.extend([''
+               ,r'\fancyhead{%s}' % opt['header']
+            ])
+        if opt['footer'] and isinstance(opt['footer'], (tuple,list)):
+            preamble.extend(['' # left, center, and right footers
+               ,r'\fancyfoot[%s]{%s}' % (left,fontprepend,opt['footer'][0])  if opt['footer'][0] else None
+               ,r'\fancyfoot[C]{%s}'  % (fontprepend,opt['footer'][1])       if opt['footer'][1] else None
+               ,r'\fancyfoot[%s]{%s}' % (right,fontprepend,opt['footer'][2]) if opt['footer'][2] else None
+            ])
+        elif opt['footer']:
+            preamble.extend([''
+               ,r'\fancyfoot{%s}' % opt['footer']
+            ])
     body = [''
        ,r'\begin{document}'
        ,r'\fontsize{%(s)s}{%(s)s}\selectfont' % {'s':opt['font'][1]} if opt['font'][1] else None
