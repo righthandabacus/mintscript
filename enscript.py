@@ -9,6 +9,7 @@ import datetime
 import socket
 import pwd
 import json
+import sys
 
 def parseargs():
     '''Argument parser that supports a subset of arguments of enscript
@@ -20,25 +21,25 @@ def parseargs():
     parser = argparse.ArgumentParser(description=description, add_help=False)
     parser.add_argument('file', metavar='file', nargs='*',
         help='Text files')
-    parser.add_argument('--columns', dest='columns', default=1, type=int,
+    parser.add_argument('--columns', default=1, type=int,
         help="specify the number of columns per page")
     parser.add_argument('-2', dest='columns', action='store_const', const=2,
         help="same as --columns=2")
     parser.add_argument('-1', dest='columns', action='store_const', const=1,
         help="same as --columns=1")
-    parser.add_argument('-b', '--header', dest='header',
+    parser.add_argument('-b', '--header', nargs=1,
         help="set page header")
     parser.add_argument('-B', '--no-header', action='store_true', default=False,
         help="no page headers")
     parser.add_argument('-c', '--truncate-lines', action='store_true',
         help="cut long lines (default is to wrap)")
-    parser.add_argument('-C', '--line-numbers', dest="start", nargs='?', type=int, const=1,
+    parser.add_argument('-C', '--line-numbers', nargs='?', type=int, const=1,
         help="precede each line with its line number")
-    parser.add_argument('-E', '--highlight', dest="lang", nargs='?',
+    parser.add_argument('-E', '--highlight', nargs='?',
         help="highlight source code (see pygmentize -L lexers)")
-    parser.add_argument('-f', '--font', metavar='NAME', dest="font", nargs=1,
+    parser.add_argument('-f', '--font', metavar='NAME', nargs=1,
         help="use font NAME for body text")
-    parser.add_argument('-F', '--header-font', metavar='NAME', dest="font", nargs=1,
+    parser.add_argument('-F', '--header-font', metavar='NAME', nargs=1,
         help="use font NAME for header text")
     parser.add_argument('--fancy-header', metavar='NAME', nargs='?', const=True,
         help="select fancy page header")
@@ -48,8 +49,8 @@ def parseargs():
         help="read input files through input filter CMD")
     parser.add_argument('-j', '--borders', action='store_true',
         help="print borders around columns")
-    parser.add_argument('-M', '--media', metavar='NAME', nargs=1,
-        help="use output media NAME")
+    parser.add_argument('-M', '--media', metavar='PAPER', nargs=1,
+        help="use output media PAPER")
     parser.add_argument('-p', '-o', '--output', metavar='FILE', nargs=1,
         help="leave output to file FILE.  If FILE is `-', leave output to stdout.")
     parser.add_argument('-q', '--quiet', '--silent', dest='quiet', action='store_true',
@@ -92,7 +93,7 @@ def parseargs():
         help="print underlays with font NAME")
     parser.add_argument('--ul-gray', metavar='NUM', nargs=1, type=float,
         help="print underlays with gray value NUM")
-    parser.add_argument('--ul-position', metavar='POS', nargs=4, type=float,
+    parser.add_argument('--ul-position', metavar='POS', nargs=1,
         help="set underlay's starting position to POS")
     parser.add_argument('--ul-style', metavar='STYLE', nargs=1,
         help="print underlays with style STYLE")
@@ -100,6 +101,8 @@ def parseargs():
         help="wrap long lines from word boundaries")
     parser.add_argument('--geometry-args', metavar='OPTION', nargs='+',
         help="argument for geometry package")
+    parser.add_argument('--fontspec-args', metavar='OPTION', nargs='+',
+        help=r"argument for fontspec \set*font commands")
     parser.add_argument('--minted-args', metavar='OPTION', nargs='+',
         help=r"argument for \inputminted command")
     args = parser.parse_args()
@@ -130,9 +133,12 @@ def parseformat(formatstr, inputfile=None):
     cwd = os.getcwd()
     cwdtrail = os.path.split(os.getcwd())[-1]
     if inputfile:
+        inputfile = inputfile[0]
         now = datetime.datetime.fromtimestamp(os.stat(inputfile).st_mtime)
     else:
         now = datetime.datetime.now()
+    formatstr = re.sub(r'\$\((\w+)\)', lambda m:os.environ[m.group(1)],formatstr)
+    formatstr = re.sub(r'\$D\{([^\}]+)\}', lambda m:now.strftime(m.group(1)),formatstr)
     formatstr = ( formatstr
                  .replace('$%',r'\thepage{}')
                  .replace('$=',r'\pageref{LastPage}') # need LastPage label
@@ -140,6 +146,7 @@ def parseformat(formatstr, inputfile=None):
                                     .replace('%C',now.strftime('%H:%M:%S'))
                  .replace('$t','%t').replace('%t',now.strftime('%I:%M %p'))
                  .replace('$T','%T').replace('%T',now.strftime('%H:%M'))
+                 .replace('$D','%D').replace('%D',now.strftime('%y-%m-%d'))
                  .replace('$E','%E').replace('%E',now.strftime('%y/%m/%d'))
                  .replace('$F','%F').replace('%F',now.strftime('%d.%m.%Y'))
                  .replace('$W','%W').replace('%W',now.strftime('%m/%d/%y'))
@@ -148,19 +155,14 @@ def parseformat(formatstr, inputfile=None):
                  .replace('%m',socket.gethostname())
                  .replace('%M',socket.getfqdn())
                  .replace('%n',pwd.getpwuid(os.getuid()).pw_name)
-                 .replace('$n',os.path.basename(inputfile))
+                 .replace('$n',os.path.basename(inputfile) if inputfile else '')
                  .replace('%N',pwd.getpwuid(os.getuid()).pw_gecos)
-                 .replace('$N',inputfile)
-                )
-    # TODO %v for sequence number of input file (in case of multiple file input)
-    #      rewrite above to get filename/mtime dynamically in case of multi-file input
-    formatstr = re.sub(r'\$\((\w+)\)', lambda m:os.environ[m.group(1)],formatstr)
-    formatstr = re.sub(r'\$D\{([^\}]+)\}', lambda m:now.strftime(m.group(1)),formatstr)
-    formatstr = ( formatstr
-                 .replace('$D','%D').replace('%D',now.strftime('%y-%m-%d'))
+                 .replace('$N',inputfile if inputfile else '')
                  .replace('$$','$')
                  .replace('%%','%')
                 )
+    # TODO %v for sequence number of input file (in case of multiple file input)
+    #      rewrite above to get filename/mtime dynamically in case of multi-file input
     return formatstr
 
 def parsefont(fontstr):
