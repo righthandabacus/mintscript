@@ -37,7 +37,7 @@ def latexoptions(args):
     if args.media:
         ret['geometry'].append(args.media) # TODO need sanitation check
     else:
-        ret['geometry'].append('letterpaper') # TODO need sanitation check
+        ret['geometry'].append('letterpaper')
     if args.landscape:
         ret['geometry'].append('landscape')
     if args.portrait:
@@ -52,7 +52,7 @@ def latexoptions(args):
             for t,v in zip(["left","right","top","bottom"], args.margins)
         )
     else:
-        ret['geometry'].append('margin=15mm')
+        ret['geometry'].append('margin=15mm') # default margin
     if args.truncate_lines:
         ret['minted'].append('breaklines=false')
     else:
@@ -120,37 +120,19 @@ def buildlatex(opt, filenames):
        ,r'\usepackage{fontspec}'
        ,r'\usepackage{minted}'
        ,r'\usemintedstyle{%s}'%opt['mintedstyle'] if opt['mintedstyle'] else None
-    ]+(['' # underlay (TODO broken, should not use background package)
+    ]+([''
        ,r'\usepackage{tikz}'
        ,r'\usepackage{tikzpagenodes}'
-       ,r'\usepackage{background}'
        ,r'\usetikzlibrary{calc}'
-      ,(r'\newfontfamily\Overlayfont{%s}' % opt['underlay']['font'][0])
-             if opt['underlay']['font'][0] else None
-       ,r'\backgroundsetup{'
-       ,r'   angle=0,'
-       ,r'   opacity=1,'
-       ,r'   scale=1,'
-       ,r'   color=black,'
-       ,r'   contents={'
-       ,r'     \begin{tikzpicture}[remember picture,overlay]'
-       ,r'        \Overlayfont' if opt['underlay']['font'][0] else None
-      ,(r'        \fontsize{%(s)d}{%(s)d}' % {'s':opt['underlay']['font'][1]})
-                      if opt['underlay']['font'][1] else None
-       ,r'        \selectfont' if any(opt['underlay']['font']) else None
-       ,r'       \node[text=black!%(gray)f!white,rotate=%(angle)f] at '
-                   '($(current page.center) + (%(xpos)s,%(ypos)s)$)'
-                   ' {%(text)s};' % opt['underlay']
-       ,r'     \end{tikzpicture}'
-       ,r'   }'
-       ,r'}'
     ] if 'underlay' in opt else [])+([''
        ,r'\setmonofont[%(a)s]{%(f)s}' % {'a':opt.get('fontspec_args',''),'f':opt['font'][0]}
        ,r'\setsansfont[%(a)s]{%(f)s}' % {'a':opt.get('fontspec_args',''),'f':opt['font'][0]}
        ,r'\setmainfont[%(a)s]{%(f)s}' % {'a':opt.get('fontspec_args',''),'f':opt['font'][0]}
-    ] if opt['font'][0] else [
-    ])
-    if not opt['header'] and not opt['footer']:
+    ] if opt['font'][0] else [])
+
+    lh,ch,rh,lf,cf,rf = range(6)
+    headfoot = [None]*6
+    if not opt['header'] and not opt['footer'] and 'underlay' not in opt:
         preamble.extend([
             r'\pagestyle{empty}'
         ])
@@ -162,41 +144,51 @@ def buildlatex(opt, filenames):
            ,r'\renewcommand{\footrulewidth}{0pt}'
            ,r'\fancyhf{}'
         ])
+        for i,hf in [(lh,'header'),(lf,'footer')]:
+            if isinstance(opt[hf], list):
+                headfoot[i:i+3] = opt[hf] # assumed len=3
+            elif opt[hf]: # string type = header/footer at center
+                headfoot[i+1] = opt[hf].replace('\t',r'\hfill{}')
         font,size = opt.get('header_font',[None,None])
         fontprepend = ''
-        if font:
+        if font: # header font provided
             preamble.extend([''
                ,r'\newfontfamily\Headerfont{%s}' % font
-            ])
-            fontprepend=r'\Headerfont'
-        if size:
+            ''])
+            fontprepend = r'\Headerfont'
+        if size: # header font size provided
             fontprepend+=r'\fontsize{%(s)s}{%(s)s}' % {'s':size}
-        if fontprepend:
+        if fontprepend: # header font/fontsize not default, modify header strings
             fontprepend+=r'\selectfont{}'
-        if 'twoside' in opt['geometry']:
-            left, right = 'LO,RE', 'RO,LE'
-        else:
-            left, right = 'L', 'R'
-        if opt['header'] and isinstance(opt['header'], (tuple,list)):
-            preamble.extend(['' # left, center, and right headers
-               ,r'\fancyhead[%s]{%s%s}' % (left,fontprepend,opt['header'][0])  if opt['header'][0] else None
-               ,r'\fancyhead[C]{%s%s}'  % (fontprepend,opt['header'][1])       if opt['header'][1] else None
-               ,r'\fancyhead[%s]{%s%s}' % (right,fontprepend,opt['header'][2]) if opt['header'][2] else None
-            ])
-        elif opt['header']:
-            preamble.extend([''
-               ,r'\fancyhead[C]{%s}' % opt['header'].replace('\t',r'\hfill{}')
-            ])
-        if opt['footer'] and isinstance(opt['footer'], (tuple,list)):
-            preamble.extend(['' # left, center, and right footers
-               ,r'\fancyfoot[%s]{%s}' % (left,fontprepend,opt['footer'][0])  if opt['footer'][0] else None
-               ,r'\fancyfoot[C]{%s}'  % (fontprepend,opt['footer'][1])       if opt['footer'][1] else None
-               ,r'\fancyfoot[%s]{%s}' % (right,fontprepend,opt['footer'][2]) if opt['footer'][2] else None
-            ])
-        elif opt['footer']:
-            preamble.extend([''
-               ,r'\fancyfoot[C]{%s}' % opt['footer'].replace('\t',r'\hfill{}')
-            ])
+            for i,v in enumerate(headfoot):
+                if v:
+                    headfoot[i] = fontprepend+headfoot[i]
+        left, right = ('LO,RE', 'RO,LE') if 'twoside' in opt['geometry'] else ('L', 'R')
+        if 'underlay' in opt:
+            if opt['underlay']['font'][0]:
+                preamble.extend([''
+                    ,r'\newfontfamily\Overlayfont{%s}' % opt['underlay']['font'][0]
+                ''])
+            headfoot[rh].append('\n'.join(filter(None,[''
+                ,r'\begin{tikzpicture}[remember picture,overlay]'
+                ,    r'\Overlayfont' if opt['underlay']['font'][0] else None
+                ,   (r'\fontsize{%(s)d}{%(s)d}' % {'s':opt['underlay']['font'][1]})
+                        if opt['underlay']['font'][1] else None
+                ,    r'\selectfont' if any(opt['underlay']['font']) else None
+                ,    r'\node[text=black!%(gray)f!white,rotate=%(angle)f] at '
+                            '($(current page.center) + (%(xpos)s,%(ypos)s)$)'
+                            ' {%(text)s};' % opt['underlay']
+                ,r'\end{tikzpicture}'
+            ])))
+        preamble.extend(['' # header and footers config
+           ,r'\fancyhead[%s]{%s}' % (left,headfoot[lf])  if headfoot[lh] else None
+           ,r'\fancyhead[C]{%s}'  % headfoot[ch]         if headfoot[ch] else None
+           ,r'\fancyhead[%s]{%s}' % (right,headfoot[rh]) if headfoot[rh] else None
+           ,r'\fancyfoot[%s]{%s}' % (left,headfoot[lf])  if headfoot[lf] else None
+           ,r'\fancyfoot[C]{%s}'  % headfoot[cf]         if headfoot[cf] else None
+           ,r'\fancyfoot[%s]{%s}' % (right,headfoot[rf]) if headfoot[rf] else None
+        ])
+
     body = [''
        ,r'\begin{document}'
        ,r'\fontsize{%(s)s}{%(s)s}\selectfont' % {'s':opt['font'][1]} if opt['font'][1] else None
