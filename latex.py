@@ -13,7 +13,8 @@ def latexoptions(args):
     '''
     ret = {'input':args.file, 'geometry':['xetex'], 'minted':[], 'mintedlang':'text'
           ,'mintedstyle':'autumn', 'font':('Inconsolata','8pt')
-          ,'header_font':('Inconsolata','8pt'), 'header':None, 'footer':None}
+          ,'header_font':('Inconsolata','8pt'), 'header':None, 'footer':None
+          ,'fontspec_args':['AutoFakeSlant','AutoFakeBold']}
     if args.columns==1:
         ret['geometry'].append('onecolumn')
     elif args.columns==2:
@@ -71,6 +72,8 @@ def latexoptions(args):
         ret['geometry'].extend(args.geometry_args)
     if args.minted_args:
         ret['minted'].extend(args.minted_args)
+    if args.fontspec_args:
+        ret['fontspec_args'] += args.fontspec_args
     if args.mark_wrapped_lines:
         if args.mark_wrapped_lines == 'plus':
             ret['minted'].append(r'breaksymbolright=\small+')
@@ -89,8 +92,8 @@ def latexoptions(args):
     if args.header_font: # also use as footer font
         ret['header_font'] = parsefont(args.header_font)
     if args.underlay:
-        ret['underlay'] = {'text':args.underlay, 'gray':80, 'angle':45
-                          ,'xpos':0, 'ypos':0, 'style':'filled', 'font':(None,None)}
+        ret['underlay'] = {'text':args.underlay, 'gray':20, 'angle':45
+                          ,'xpos':0, 'ypos':0, 'style':'filled', 'font':(None,64)}
         if args.ul_font:
             ret['underlay']['font'] = parsefont(args.ul_font)
         if args.ul_angle:
@@ -113,6 +116,7 @@ def latexoptions(args):
 def buildlatex(opt, filenames):
     '''Generate latex code
     '''
+    fontspecargs = ','.join(opt['fontspec_args'])
     preamble = [''
        ,r'\documentclass{article}'
        ,r'\usepackage[%s]{geometry}' % ','.join(opt['geometry'])
@@ -121,17 +125,20 @@ def buildlatex(opt, filenames):
        ,r'\usepackage{minted}'
        ,r'\usemintedstyle{%s}'%opt['mintedstyle'] if opt['mintedstyle'] else None
     ]+([''
+       ,r'\setmonofont[%(a)s]{%(f)s}' % {'a':fontspecargs,'f':opt['font'][0]}
+       ,r'\setsansfont[%(a)s]{%(f)s}' % {'a':fontspecargs,'f':opt['font'][0]}
+       ,r'\setmainfont[%(a)s]{%(f)s}' % {'a':fontspecargs,'f':opt['font'][0]}
+    ] if opt['font'][0] else [])+([''
        ,r'\usepackage{tikz}'
        ,r'\usepackage{tikzpagenodes}'
        ,r'\usetikzlibrary{calc}'
-    ] if 'underlay' in opt else [])+([''
-       ,r'\setmonofont[%(a)s]{%(f)s}' % {'a':opt.get('fontspec_args',''),'f':opt['font'][0]}
-       ,r'\setsansfont[%(a)s]{%(f)s}' % {'a':opt.get('fontspec_args',''),'f':opt['font'][0]}
-       ,r'\setmainfont[%(a)s]{%(f)s}' % {'a':opt.get('fontspec_args',''),'f':opt['font'][0]}
-    ] if opt['font'][0] else [])
+       ,r'\makeatletter' # https://tex.stackexchange.com/questions/165929/semiverbatim-with-tikz-in-beamer/165937#165937
+       ,r'\global\let\tikz@ensure@dollar@catcode=\relax'
+       ,r'\makeatother'
+    ] if 'underlay' in opt else [])
 
     lh,ch,rh,lf,cf,rf = range(6)
-    headfoot = [None]*6
+    headfoot = ['']*6
     if not opt['header'] and not opt['footer'] and 'underlay' not in opt:
         preamble.extend([
             r'\pagestyle{empty}'
@@ -154,7 +161,7 @@ def buildlatex(opt, filenames):
         if font: # header font provided
             preamble.extend([''
                ,r'\newfontfamily\Headerfont{%s}' % font
-            ''])
+            ])
             fontprepend = r'\Headerfont'
         if size: # header font size provided
             fontprepend+=r'\fontsize{%(s)s}{%(s)s}' % {'s':size}
@@ -168,8 +175,8 @@ def buildlatex(opt, filenames):
             if opt['underlay']['font'][0]:
                 preamble.extend([''
                     ,r'\newfontfamily\Overlayfont{%s}' % opt['underlay']['font'][0]
-                ''])
-            headfoot[rh].append('\n'.join(filter(None,[''
+                ])
+            headfoot[rh] += '\n'.join(filter(None,[''
                 ,r'\begin{tikzpicture}[remember picture,overlay]'
                 ,    r'\Overlayfont' if opt['underlay']['font'][0] else None
                 ,   (r'\fontsize{%(s)d}{%(s)d}' % {'s':opt['underlay']['font'][1]})
@@ -179,7 +186,7 @@ def buildlatex(opt, filenames):
                             '($(current page.center) + (%(xpos)s,%(ypos)s)$)'
                             ' {%(text)s};' % opt['underlay']
                 ,r'\end{tikzpicture}'
-            ])))
+            ]))
         preamble.extend(['' # header and footers config
            ,r'\fancyhead[%s]{%s}' % (left,headfoot[lf])  if headfoot[lh] else None
            ,r'\fancyhead[C]{%s}'  % headfoot[ch]         if headfoot[ch] else None
