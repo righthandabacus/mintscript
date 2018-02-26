@@ -201,6 +201,6 @@ def parsefont(fontstr):
                 raise RuntimeError # fontstr is pure numeric?
     try:
         size = "%fpt" % float(size) # default unit: point
-    except ValueError:
+    except (TypeError,ValueError):
         pass # pass as-is if cannot parse
     return font, size
