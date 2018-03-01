@@ -29,10 +29,24 @@ def parseargs():
         help='Text files')
     parser.add_argument('--columns', default=1, type=int,
         help="specify the number of columns per page")
-    parser.add_argument('-2', dest='columns', action='store_const', const=2,
-        help="same as --columns=2")
     parser.add_argument('-1', dest='columns', action='store_const', const=1,
         help="same as --columns=1")
+    parser.add_argument('-2', dest='columns', action='store_const', const=2,
+        help="same as --columns=2")
+    parser.add_argument('-3', dest='columns', action='store_const', const=3,
+        help="same as --columns=3")
+    parser.add_argument('-4', dest='columns', action='store_const', const=4,
+        help="same as --columns=4")
+    parser.add_argument('-5', dest='columns', action='store_const', const=5,
+        help="same as --columns=5")
+    parser.add_argument('-6', dest='columns', action='store_const', const=6,
+        help="same as --columns=6")
+    parser.add_argument('-7', dest='columns', action='store_const', const=7,
+        help="same as --columns=7")
+    parser.add_argument('-8', dest='columns', action='store_const', const=8,
+        help="same as --columns=8")
+    parser.add_argument('-9', dest='columns', action='store_const', const=9,
+        help="same as --columns=9")
     parser.add_argument('-b', '--header',
         help="set page header")
     parser.add_argument('-B', '--no-header', action='store_true', default=False,
@@ -83,7 +97,7 @@ def parseargs():
         help="set page footer")
     parser.add_argument('--help', action="store_true",
         help="print this help and exit")
-    parser.add_argument('--margins', metavar=('LEFT','RIGHT','TOP','BOTTOM'), nargs=4, type=float,
+    parser.add_argument('--margins', metavar=('LEFT','RIGHT','TOP','BOTTOM'), nargs=4,
         help="adjust page marginals")
     parser.add_argument('--mark-wrapped-lines', metavar='STYLE', nargs='?',
         help="mark wrapped lines in the output with STYLE")
@@ -221,7 +235,7 @@ def latexoptions(args):
         dict: holds LaTeX packages options
     '''
     ret = {'input':args.file, 'geometry':['xetex'], 'minted':[], 'mintedlang':'text'
-          ,'mintedstyle':'autumn', 'font':('Inconsolata','8pt')
+          ,'mintedstyle':'autumn', 'font':('Inconsolata','8pt'), 'multicols':None
           ,'header_font':('Inconsolata','8pt'), 'header':None, 'footer':None
           ,'fontspec_args':['AutoFakeSlant','AutoFakeBold']}
     if args.columns==1:
@@ -229,7 +243,7 @@ def latexoptions(args):
     elif args.columns==2:
         ret['geometry'].append('twocolumn')
     else:
-        raise NotImplementedError
+        ret['multicols'] = args.columns
     if args.line_numbers is not None:
         ret['minted'].append('linenos')
         if args.line_numbers != 1:
@@ -344,7 +358,10 @@ def buildlatex(opt, filenames):
        ,r'\makeatletter' # https://tex.stackexchange.com/questions/165929/semiverbatim-with-tikz-in-beamer/165937#165937
        ,r'\global\let\tikz@ensure@dollar@catcode=\relax'
        ,r'\makeatother'
-    ] if 'underlay' in opt else [])
+    ] if 'underlay' in opt else [])+([''
+        r'\usepackage{multicol}'
+       ,r'\setlength{\columnsep}{5mm}'
+    ] if opt['multicols'] else [])
 
     lh,ch,rh,lf,cf,rf = range(6)
     headfoot = ['']*6
@@ -408,11 +425,13 @@ def buildlatex(opt, filenames):
     body = [''
        ,r'\begin{document}'
        ,r'\fontsize{%(s)s}{%(s)s}\selectfont' % {'s':opt['font'][1]} if opt['font'][1] else None
-    ]+[
+    ]+([r'\begin{multicols*}{%d}' % opt['multicols']
+    ] if opt['multicols'] else [])+[
        (r'\inputminted[%(a)s]{%(l)s}{%(f)s}' + '\n')
             % {'a':','.join(opt['minted']), 'l':opt['mintedlang'], 'f':f}
         for f in filenames
-    ]+[''
+    ]+([r'\end{multicols*}'
+    ] if opt['multicols'] else [])+[''
        ,r'\label{LastPage}'
        ,r'\end{document}'
     ]
