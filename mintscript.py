@@ -235,8 +235,8 @@ def latexoptions(args):
         dict: holds LaTeX packages options
     '''
     ret = {'input':args.file, 'geometry':['xetex'], 'minted':[], 'mintedlang':'text'
-          ,'mintedstyle':'autumn', 'font':('Inconsolata','8pt'), 'multicols':None
-          ,'header_font':('Inconsolata','8pt'), 'header':None, 'footer':None
+          ,'mintedstyle':'autumn', 'font':('inconsolata','8pt'), 'multicols':None
+          ,'header_font':('inconsolata','8pt'), 'header':None, 'footer':None
           ,'fontspec_args':['AutoFakeSlant','AutoFakeBold']}
     if args.columns==1:
         ret['geometry'].append('onecolumn')
