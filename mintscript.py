@@ -251,11 +251,14 @@ def latexoptions(args):
     if args.color == True and not args.highlight:
         raise NotImplementedError # color needs a language for pygmentize
     if args.highlight is not None:
-        if args.highlight.lower() == 'python3':
+        highlight = args.highlight.lower()
+        if highlight == 'auto':
+            highlight = os.path.splitext(args.file[0])[1][1:]
+        if highlight == 'python3':
             ret['minted'].append('python3')
             ret['mintedlang']  = 'python'
         else:
-            ret['mintedlang']  = args.highlight
+            ret['mintedlang']  = highlight
     if args.borders:
         ret['minted'].append('frame=single')
     if args.media:
